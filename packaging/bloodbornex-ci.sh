@@ -3,7 +3,7 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")/.."
 mkdir -p out
 python3 -m unittest discover -s tests -p 'test_*.py' -v 2>&1 | tee out/python-tests.log
-BB_NET=OFF BB_LTO=ON BB_PGO=off BB_BUILD_JOBS=2 bash build.sh
+BB_NET=OFF BB_LTO=ON BB_PGO=off BB_BUILD_JOBS=4 bash build.sh
 ninja -j2 -C out/gpu settings-test frame-generation-test
 out/gpu/settings-test 2>&1 | tee out/settings-test.log
 # This exercises the actual production class with Lavapipe and the Vulkan validation layer.

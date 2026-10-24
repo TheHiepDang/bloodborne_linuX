@@ -24,7 +24,18 @@ jobs:
             experimental-features = nix-command flakes
             max-jobs = 2
             cores = 2
+      - uses: actions/cache/restore@3edfce9056124e459a23f683a21433670d47daca
+        id: compiler_cache
+        with:
+          path: ${{ runner.temp }}/bloodbornex-ccache
+          key: bloodbornex-nix02c087f-${{ github.sha }}
+          restore-keys: bloodbornex-nix02c087f-
       - name: Build and verify
+        env:
+          CCACHE_DIR: ${{ runner.temp }}/bloodbornex-ccache
+          CCACHE_BASEDIR: ${{ github.workspace }}
+          CCACHE_NOHASHDIR: 'true'
+          CCACHE_MAXSIZE: 2G
         run: nix-shell packaging/bloodbornex-shell.nix --run 'bash packaging/bloodbornex-ci.sh'
       - name: Permit the AppImage user namespace smoke test
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -37,6 +48,11 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
+      - uses: actions/cache/save@3edfce9056124e459a23f683a21433670d47daca
+        if: always() && steps.compiler_cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/bloodbornex-ccache
+          key: bloodbornex-nix02c087f-${{ github.sha }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: failure()
         with:

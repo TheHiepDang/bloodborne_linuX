@@ -16,7 +16,7 @@ int main() {
     dispatch.init(loader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
     dispatch.init(instance.GetInstance());
     dispatch.init(instance.GetDevice());
-    Scheduler scheduler(instance);
+    Scheduler scheduler(instance, true);
     FrameGeneration generator(instance, scheduler);
     BbSettings::Get().frame_generation = true;
     assert(generator.Wanted()); // CI uses Lavapipe; unsupported devices are not a pass.

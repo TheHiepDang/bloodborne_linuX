@@ -3,6 +3,8 @@ from paths import ROOT
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -14,6 +16,24 @@ spec.loader.exec_module(profile)
 
 
 class PreviewProfileTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'posix', 'packaged exec chain targets Linux')
+    def test_package_entry_selects_profile_before_starting_its_child(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            env = dict(os.environ, XDG_DATA_HOME=str(root / 'data'),
+                       XDG_CONFIG_HOME=str(root / 'config'), XDG_CACHE_HOME=str(root / 'cache'),
+                       BB_DATA_DIR=str(root / 'stable'), BB_CONFIG=str(root / 'stable/settings.ini'),
+                       VK_DRIVER_FILES='explicit-test-driver.json')
+            program = 'import json,os; print(json.dumps({k:os.environ[k] for k in ("BB_DATA_DIR","BB_CONFIG","BB_USER_DIR")}))'
+            result = subprocess.run([sys.executable, str(ROOT / 'launcher/bloodbornex_entry.py'),
+                                     sys.executable, '-c', program], env=env,
+                                    text=True, capture_output=True, check=True, timeout=20)
+            paths = json.loads(result.stdout)
+            self.assertEqual(Path(paths['BB_DATA_DIR']), root / 'data/bloodbornex')
+            self.assertEqual(Path(paths['BB_CONFIG']), root / 'data/bloodbornex/bbport.ini')
+            self.assertEqual(Path(paths['BB_USER_DIR']), root / 'data/bloodbornex/user')
+            self.assertFalse((root / 'stable').exists())
+
     def test_preview_never_uses_stable_paths_and_keeps_changes_on_relaunch(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

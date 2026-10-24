@@ -263,8 +263,9 @@ target_include_directories(settings-test PRIVATE .. shim)
 add_executable(frame-generation-test EXCLUDE_FROM_ALL ../tests/test_frame_generation.cpp
     ../tests/test_gpu_runtime_stubs.cpp)
 target_include_directories(frame-generation-test PRIVATE . shim ${SHADER_INCLUDE} third_party/gcn/include)
-target_compile_options(frame-generation-test PRIVATE -UNDEBUG -fPIC -fvisibility=hidden
-    -fvisibility-inlines-hidden)
+target_compile_options(frame-generation-test PRIVATE -UNDEBUG -fPIC)
+set_source_files_properties(../tests/test_frame_generation.cpp PROPERTIES
+    COMPILE_OPTIONS "-fvisibility=hidden;-fvisibility-inlines-hidden")
 target_link_libraries(frame-generation-test PRIVATE bbgpu)
 
 add_executable(scene-resolution-test EXCLUDE_FROM_ALL ../tests/test_scene_resolution.cpp ../tests/test_gpu_runtime_stubs.cpp)

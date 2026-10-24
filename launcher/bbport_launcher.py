@@ -2073,7 +2073,12 @@ if __name__ == "__main__":
         print(json.dumps({"app": "BloodborneX", "data_dir": str(DATA_DIR),
                           "launcher_config": str(CONFIG_DIR),
                           "fg_experimental": os.environ.get("BB_FRAME_GEN_EXPERIMENTAL")}), flush=True)
-        sys.exit(subprocess.call([str(binaries_dir() / 'bb-gpu-capabilities'), '--gpus']))
+        detected = subprocess.call([str(binaries_dir() / 'bb-gpu-capabilities'), '--gpus'])
+        if detected:
+            sys.exit(detected)
+        # Load the actual game executable and libbbgpu from the package as well as the
+        # standalone capability helper. This branch submits/readbacks a tiny buffer, no game.
+        sys.exit(subprocess.call([str(binaries_dir() / 'bb-probe'), '--vulkan-only']))
     if "--play" in sys.argv[1:]:
         sys.exit(play())
     if "--build-fsr411" in sys.argv[1:]:

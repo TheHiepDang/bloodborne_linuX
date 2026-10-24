@@ -44,7 +44,8 @@ preview over them. To stop using it, close BloodborneX and launch the stable app
 
 TROUBLESHOOTING
 From a terminal, ./BloodborneX-*.AppImage --self-test checks package startup,
-profile paths and Vulkan device detection without starting the game.
+profile paths, Vulkan device detection and a tiny GPU submission/readback without
+starting the game.
 If FUSE is unavailable, try APPIMAGE_EXTRACT_AND_RUN=1 ./BloodborneX-*.AppImage.
 Linux user namespaces must be enabled (the existing bbport AppImage uses them
 too). The preview bundles its own Linux libraries and Mesa Vulkan drivers.

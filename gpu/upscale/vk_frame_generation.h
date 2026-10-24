@@ -8,8 +8,8 @@
 //    reuses its depth buffer before the display pass) and its motion vectors and camera kept.
 //  - Interpolate, at the game's display pass: the output-size image holds the finished frame,
 //    UI and all. Prepare (optical flow on that frame) and the interpolation are recorded there,
-//    before the next frame's work. No HUD-less image: the game draws more than its HUD over the
-//    upscaled scene, and FSR pastes whatever differs uninterpolated (a double image).
+//    before the next frame's work. CaptureHudless keeps the scene before its first UI draw;
+//    interpolation uses that copy when available.
 //  - The presenter encodes that output like the real frame (PrepareFrame) and shows it first.
 // Settings: frame_generation in bbport.ini, the in-game menu, BB_FRAME_GEN=1.
 #pragma once
@@ -39,6 +39,10 @@ public:
     /// The setting is on and the GPU can.
     bool Wanted() const;
 
+    /// A display without an eligible scene, or FG disabled: discard pending output and history.
+    /// Called on the same producer thread as CaptureScene/Interpolate, never the recorder.
+    void Invalidate();
+
     /// What the scene of this frame was rendered with (render size: depth and motion).
     struct Scene {
         vk::Image color;   ///< output size, the upscaled scene (UI not drawn yet), General
@@ -55,7 +59,7 @@ public:
         /// The camera in the world (FSR's frame interpolation uses them).
         float camera_position[3], camera_up[3], camera_right[3], camera_forward[3];
     };
-    /// End of the upscaler's scaled run (recording thread): keeps the HUD-less copy and the inputs.
+    /// End of the upscaler's scaled run: keeps the scene inputs and copies its depth.
     void CaptureScene(const Scene& scene);
 
     /// The first UI draw of the frame is about to run over `color` (the scene's image): what it
@@ -85,6 +89,7 @@ private:
     Scheduler& scheduler;
     bool supported = false;
     bool failed = false;
+    std::atomic<bool> dispatch_failed{false};
 
     FfxVkPortableFrameGenerationContext* context = nullptr;
     u32 context_render_w = 0, context_render_h = 0, context_w = 0, context_h = 0;

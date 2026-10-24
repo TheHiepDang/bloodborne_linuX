@@ -609,10 +609,13 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool) {
     if (!blank && frame->has_interp && frame->interp_image) {
         frame->has_interp = false;
         static std::atomic<u64> shown{0};
-        if (const u64 n = ++shown; n == 1 || n % 1000 == 0) {
-            std::printf("Frame generation: %llu interpolated frames shown\n", (unsigned long long)n);
-        }
         if (PresentImage(frame, frame->interp_image, false)) {
+            if (const u64 n = ++shown; n == 1 || n % 1000 == 0) {
+                // Presentation accepted by Vulkan; not a scanout measurement. Dispatch failure
+                // may have substituted a real-frame copy (reported by the FG statistics).
+                std::printf("Frame generation: %llu generated-slot presents accepted\n",
+                            (unsigned long long)n);
+            }
             std::this_thread::sleep_until(now + std::chrono::duration_cast<Clock::duration>(
                                                     std::chrono::duration<double, std::milli>(
                                                         std::clamp(interval_ms * 0.5, 1.0, 50.0))));

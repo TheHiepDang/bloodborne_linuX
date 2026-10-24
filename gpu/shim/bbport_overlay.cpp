@@ -573,8 +573,10 @@ void Menu() {
         "До 1 — резкость самого апскейлера (RCAS). Выше 1 добавляется ещё один проход RCAS. "
         "Ctrl+клик по ползунку — ввести точное значение."));
     ImGui::EndDisabled();
-    // Frame generation: hidden until its artifacts are fixed (BB_FRAME_GEN=1 for tests).
-    if (std::getenv("BB_FRAME_GEN")) {
+    // BloodborneX is an explicit experiment; stable launches keep this option hidden.
+    const char* fg_experiment = std::getenv("BB_FRAME_GEN_EXPERIMENTAL");
+    if (std::getenv("BB_FRAME_GEN") ||
+        (fg_experiment && std::strcmp(fg_experiment, "1") == 0)) {
         ImGui::BeginDisabled(!s.frame_generation_supported.load(std::memory_order_relaxed));
         Checkbox(BbSettings::MenuText("Frame generation (FSR 3)", "Генерация кадров (FSR 3)"),
                  s.frame_generation);

@@ -61,13 +61,15 @@ void ImageBarrier(vk::CommandBuffer cmdbuf, vk::Image image, vk::PipelineStageFl
 
 namespace {
 std::atomic<u64> stat_captured{0}, stat_interpolated{0}, stat_ready{0}, stat_taken{0}, stat_missed{0};
+std::atomic<u64> stat_dispatched{0}, stat_failed{0};
 void Stats() {
     static std::atomic<u64> calls{0};
     if (++calls % 2000 == 0) {
         std::printf("Frame generation stats: captured %llu interpolated %llu ready %llu taken %llu "
-                    "missed %llu\n", (unsigned long long)stat_captured.load(),
+                    "missed %llu dispatch_ok %llu dispatch_failed %llu\n", (unsigned long long)stat_captured.load(),
                     (unsigned long long)stat_interpolated.load(), (unsigned long long)stat_ready.load(),
-                    (unsigned long long)stat_taken.load(), (unsigned long long)stat_missed.load());
+                    (unsigned long long)stat_taken.load(), (unsigned long long)stat_missed.load(),
+                    (unsigned long long)stat_dispatched.load(), (unsigned long long)stat_failed.load());
     }
 }
 } // namespace
@@ -99,10 +101,27 @@ bool FrameGeneration::Wanted() const {
 }
 
 void FrameGeneration::Destroy() {
-    if (context) {
+    // Drain every recorded reader before releasing context-size resources. In particular the
+    // HUD-less copy must not survive a display-size/format change with its old allocation.
+    if (context || hudless || depth_copy) {
         scheduler.Finish();
+    }
+    if (context) {
         ffxVkPortableFrameGenerationContextDestroy(context);
         context = nullptr;
+    }
+    hudless.Destroy();
+    depth_copy.Destroy();
+    Invalidate();
+}
+
+void FrameGeneration::Invalidate() {
+    scene_captured = false;
+    hudless_ready = false;
+    reset_next = true;
+    std::scoped_lock lock{targets_mutex};
+    for (auto& [address, target] : targets) {
+        target.ready = false;
     }
 }
 
@@ -160,8 +179,11 @@ void FrameGeneration::CaptureScene(const Scene& in) {
     scene_captured = false;
     if (!Wanted() || !EnsureContext(in.render_width, in.render_height, in.width, in.height,
                                     in.color_format)) {
-        reset_next = true;
+        Invalidate();
         return;
+    }
+    if (dispatch_failed.exchange(false, std::memory_order_relaxed)) {
+        reset_next = true;
     }
     scene = in;
     scene_captured = true;
@@ -170,9 +192,7 @@ void FrameGeneration::CaptureScene(const Scene& in) {
     scene_reset = reset_next || in.reset;
     reset_next = false;
     ++stat_captured;
-    // The frame is interpolated as shown, UI and all (no HUD-less image: what the game draws over
-    // the upscaled scene is not only its HUD, and FSR pastes any difference uninterpolated,
-    // a double image). Optical flow needs that finished frame: Prepare runs at the display pass.
+    // Prepare runs at the display pass, using the HUD-less copy when one was captured.
     // The depth is copied now, while it is this frame's (the game reuses its depth buffer).
     if (!depth_copy || depth_copy_format != in.depth_format || depth_copy_w != in.render_width ||
         depth_copy_h != in.render_height) {
@@ -279,7 +299,8 @@ void FrameGeneration::CaptureHudless(vk::Image color) {
 
 void FrameGeneration::Interpolate(vk::Image color, VAddr display) {
     Stats();
-    if (!scene_captured || color != scene.color || !context) {
+    if (!Wanted() || !scene_captured || color != scene.color || !context) {
+        Invalidate();
         return;
     }
     ++stat_interpolated;
@@ -429,7 +450,12 @@ void FrameGeneration::Interpolate(vk::Image color, VAddr display) {
                                     ? ffxVkPortableFrameGenerationContextRecordDispatch(context, &dispatch)
                                     : prepared;
         const bool ok = dispatched == FFX_VK_PORTABLE_OK;
+        if (ok) {
+            ++stat_dispatched;
+        }
         if (!ok) {
+            ++stat_failed;
+            dispatch_failed.store(true, std::memory_order_relaxed);
             static int told = 0;
             if (told++ < 4) {
                 std::printf("Frame generation: the interpolation could not be recorded (%s %d)\n",

@@ -61,6 +61,28 @@ int main() {
     s.menu_language_chosen = false;
     BbSettings::Load();
     assert(s.menu_language == BbSettings::MenuLanguage::Russian && s.menu_language_chosen);
+    // Persistent FG is opt-in for the separate preview, with the explicit diagnostic
+    // override retaining precedence. Stable startup must still ignore a saved enable.
+    unsetenv("BB_FRAME_GEN");
+    unsetenv("BB_FRAME_GEN_EXPERIMENTAL");
+    { std::ofstream file(path); file << "frame_generation=1\n"; }
+    BbSettings::Load();
+    assert(!s.frame_generation);
+    setenv("BB_FRAME_GEN_EXPERIMENTAL", "0", 1);
+    BbSettings::Load();
+    assert(!s.frame_generation);
+    setenv("BB_FRAME_GEN_EXPERIMENTAL", "1", 1);
+    BbSettings::Load();
+    assert(s.frame_generation);
+    { std::ofstream file(path); file << "frame_generation=0\n"; }
+    BbSettings::Load();
+    assert(!s.frame_generation);
+    setenv("BB_FRAME_GEN", "1", 1);
+    BbSettings::Load();
+    assert(s.frame_generation);
+    setenv("BB_FRAME_GEN", "0", 1);
+    BbSettings::Load();
+    assert(!s.frame_generation);
     unlink(path);
     std::puts("PASS: settings save keeps other keys, menu position, menu language");
 }

@@ -20,6 +20,10 @@ import threading
 import sys
 import time
 from pathlib import Path
+if __name__ == "__main__":
+    from bloodbornex_profile import configure
+    configure()
+
 from bbport_assets import fsr411_problem
 from bbport_i18n import language, set_language, tr
 
@@ -38,7 +42,7 @@ from patches import external_patches  # noqa: E402
 # Packaged (AppImage): generated files, saves and bbport.ini live in BB_DATA_DIR.
 PACKAGED = bool(os.environ.get("BB_PREBUILT"))
 DATA_DIR = Path(os.environ.get("BB_DATA_DIR", PORT_DIR))
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "bbport-launcher"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "bloodbornex-launcher"
 CONFIG_FILE = CONFIG_DIR / "settings.json"
 MAX_LOG_LINES = 5000
 # The memory model (run.sh: BB_PC_MODEL): "auto" is the new one on every GPU (0.6), or either by
@@ -599,7 +603,7 @@ class FolderList:
 
 class LauncherWindow(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Bloodborne")
+        super().__init__(application=app, title="BloodborneX")
         self.set_default_size(760, 820)
         self.settings = load_settings()
         set_language(self.settings.get("ui_language", ""))
@@ -2034,7 +2038,7 @@ class LauncherWindow(Adw.ApplicationWindow):
 
 class LauncherApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="io.github.bbport.Launcher",
+        super().__init__(application_id="io.github.TheHiepDang.BloodborneX",
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
 
     def do_activate(self):
@@ -2065,6 +2069,11 @@ def build_fsr411(arguments):
 
 
 if __name__ == "__main__":
+    if "--self-test" in sys.argv[1:]:
+        print(json.dumps({"app": "BloodborneX", "data_dir": str(DATA_DIR),
+                          "launcher_config": str(CONFIG_DIR),
+                          "fg_experimental": os.environ.get("BB_FRAME_GEN_EXPERIMENTAL")}), flush=True)
+        sys.exit(subprocess.call([str(binaries_dir() / 'bb-gpu-capabilities'), '--gpus']))
     if "--play" in sys.argv[1:]:
         sys.exit(play())
     if "--build-fsr411" in sys.argv[1:]:

@@ -266,9 +266,12 @@ void Load() {
         {"BB_UPSCALE_PRESET", "preset"},            {"BB_OBJECT_MOTION", "object_motion"},
         {"BB_FRAME_GEN", "frame_generation"},
     };
-    // Frame generation is hidden in the menu until its artifacts are fixed: only BB_FRAME_GEN turns
-    // it on, a saved setting does not.
-    v.frame_generation = false;
+    // Stable launches retain the experimental gate. BloodborneX opts in to persistent A/B
+    // settings without forcing the saved switch on again after an in-game restart.
+    const char* fg_experiment = std::getenv("BB_FRAME_GEN_EXPERIMENTAL");
+    if (!fg_experiment || std::strcmp(fg_experiment, "1") != 0) {
+        v.frame_generation = false;
+    }
     for (const auto& [env, key] : env_keys) {
         if (const char* value = std::getenv(env)) {
             Set(v, key, value);

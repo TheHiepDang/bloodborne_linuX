@@ -2358,6 +2358,9 @@ void TemporalUpscaler::OnDisplayPassStart(VAddr address) {
     }
     if (frame_generation && ui_phase && ui_image) {
         frame_generation->Interpolate(vk::Image(ui_image), address);
+    } else if (frame_generation) {
+        // Menus, loading, disabled upscaling or a failed scene break FG's frame history too.
+        frame_generation->Invalidate();
     }
 }
 

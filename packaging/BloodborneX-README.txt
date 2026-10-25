@@ -39,6 +39,11 @@ YOUR PREVIEW DATA
 ~/.cache/bloodbornex/                  separate driver caches
 XDG directory overrides are respected, with the same BloodborneX subfolders.
 Attach this preview's latest .log and .frames.csv with your observations.
+Startup/driver failures are captured in logs/session-*.log as well. Logs are
+enabled for this preview even if the launcher's Save log checkbox is unchecked.
+For a support ZIP, run ./BloodborneX-*.AppImage --collect-logs from a terminal.
+It prints the archive path under ~/.local/share/bloodbornex/support/. The archive
+contains recent logs and build identity; it does not include saves or settings.
 Your stable shortcut and installation can stay in place. Do not copy this
 preview over them. To stop using it, close BloodborneX and launch the stable app.
 
@@ -53,5 +58,7 @@ FSR 4/4.1.1 model creation, DLSS, online helpers and MangoHud are not bundled in
 this FSR 3 test package. Keep those optional modes disabled.
 
 See BUILD-PROVENANCE.json for source revisions and automated checks. Those
-checks are not Steam Deck gameplay validation. Complete corresponding source
+checks are not Steam Deck gameplay validation. The headless FG diagnostic's
+exit code and full output are included separately; it is not a release gate for
+this hardware-test preview. Complete corresponding source
 is included in source.tar.gz; licensing is in LICENSE and the source tree.

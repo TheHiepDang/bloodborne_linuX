@@ -27,6 +27,7 @@ def configure():
         'BB_MODS_DIR': str(data / 'mods'), 'BB_MODS_CONFIG': str(data / 'mods.json'),
         'BB_PATCHES_DIR': str(data / 'patches'), 'BB_PATCHES_CONFIG': str(data / 'patches.json'),
         'BB_FRAME_GEN_EXPERIMENTAL': '1',
+        'BB_SAVE_LOG': '1', 'BB_FRAME_STATS': '1',
         'MESA_SHADER_CACHE_DIR': str(cache / 'mesa'),
         '__GL_SHADER_DISK_CACHE_PATH': str(cache / 'nvidia'),
     })

@@ -3,6 +3,15 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")/.."
 [[ -f out/bb-probe && -f out/gpu/libbbgpu.so ]] || { echo 'Build first.' >&2; exit 1; }
 root=$PWD
+python3 - <<'PY'
+import json, pathlib, subprocess
+pathlib.Path('packaging/build-info.json').write_text(json.dumps({
+    'app': 'BloodborneX', 'version': 'fg-preview.1',
+    'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+    'platform': 'linux-x86_64',
+    'nixpkgs_revision': '02c087f3fe673c9e317f206a627cb6b910336dbe',
+}))
+PY
 needed_dirs() {
     local elf=$1 lib dir
     local -a rpath

@@ -16,6 +16,8 @@ let
       in builtins.elem rel wanted || lib.any (dir: lib.hasPrefix (dir + "/") rel) assets;
   };
   python = pkgs.python3.withPackages (ps: [ ps.pygobject3 ]);
+  buildInfo = pkgs.writeText "bloodbornex-build-info.json" (builtins.toJSON
+    (builtins.fromJSON (builtins.readFile ./build-info.json)));
   fontsConf = pkgs.writeText "bloodbornex-fonts.conf" ''
     <?xml version="1.0"?>
     <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
@@ -48,6 +50,7 @@ in pkgs.stdenv.mkDerivation {
     d=$out/share/bloodbornex
     mkdir -p $d/bin/gpu $d/tools $out/bin $out/libexec
     cp run.sh LICENSE $d/
+    cp ${buildInfo} $d/BUILD-INFO.json
     cp -r launcher scripts patches $d/
     cp -r tools/fsr4cap $d/tools/
     install -m755 out/bb-probe out/bb-gpu-capabilities $d/bin/

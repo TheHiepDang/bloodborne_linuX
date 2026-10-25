@@ -64,7 +64,7 @@ std::atomic<u64> stat_captured{0}, stat_interpolated{0}, stat_ready{0}, stat_tak
 std::atomic<u64> stat_dispatched{0}, stat_failed{0};
 void Stats() {
     static std::atomic<u64> calls{0};
-    if (++calls % 2000 == 0) {
+    if (++calls % 150 == 0) {
         std::printf("Frame generation stats: captured %llu interpolated %llu ready %llu taken %llu "
                     "missed %llu dispatch_ok %llu dispatch_failed %llu\n", (unsigned long long)stat_captured.load(),
                     (unsigned long long)stat_interpolated.load(), (unsigned long long)stat_ready.load(),
@@ -154,12 +154,16 @@ bool FrameGeneration::EnsureContext(u32 render_width, u32 render_height, u32 wid
     create.outputFormat = static_cast<VkFormat>(format);
     if (const u64 issues = ffxVkPortableValidateFrameGenerationCreateInfo(&create)) {
         std::printf("Frame generation: invalid context (%s)\n", ffxVkPortableValidationIssueName(issues));
+        BbSettings::Get().frame_generation_problem = "Invalid FSR frame generation context; see the log and restart";
+        BbSettings::Get().frame_generation_supported = false;
         failed = true;
         return false;
     }
-    if (ffxVkPortableFrameGenerationContextCreate(&device_info, &create, &context) !=
-        FFX_VK_PORTABLE_OK) {
-        std::printf("Frame generation: the context could not be made\n");
+    const auto created = ffxVkPortableFrameGenerationContextCreate(&device_info, &create, &context);
+    if (created != FFX_VK_PORTABLE_OK) {
+        std::printf("Frame generation: the context could not be made (error %d)\n", int(created));
+        BbSettings::Get().frame_generation_problem = "FSR frame generation context creation failed; see the log and restart";
+        BbSettings::Get().frame_generation_supported = false;
         context = nullptr;
         failed = true;
         return false;

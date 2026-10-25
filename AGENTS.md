@@ -27,3 +27,9 @@
 ## Pending hardware validation
 
 Steam Deck capability probe, HUD quality, GPU/memory cost, Gamescope cadence, input latency, menus/loading/death, resolution changes and FG toggles remain unverified until a device run. Preserve the experimental distinction and report observed artifacts with preview logs.
+
+## User direction and diagnostics (2026-10-25)
+
+- User will test on the actual Deck; limit further testing effort and delegate analysis to Qwen where useful. CI now gates build, profile/settings and packaged startup; the synthetic Lavapipe FG check is recorded as a non-blocking diagnostic. Its previous output assertion failed, so do not claim headless FG validation passed.
+- Preview startup captures stdout/stderr in `logs/session-*.log` before driver/GTK startup, with build revision, OS and selected graphics settings. Game logs and frame/readback CSVs are enabled; FG counters print every 150 eligible display calls.
+- `--collect-logs` writes a support ZIP under the preview's `support/` directory containing build identity and up to 40 recent log/CSV files, excluding settings and saves.

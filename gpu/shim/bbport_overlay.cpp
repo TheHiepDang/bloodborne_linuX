@@ -578,8 +578,12 @@ void Menu() {
     if (std::getenv("BB_FRAME_GEN") ||
         (fg_experiment && std::strcmp(fg_experiment, "1") == 0)) {
         ImGui::BeginDisabled(!s.frame_generation_supported.load(std::memory_order_relaxed));
+        const bool previous_fg = s.frame_generation.load(std::memory_order_relaxed);
         Checkbox(BbSettings::MenuText("Frame generation (FSR 3)", "Генерация кадров (FSR 3)"),
                  s.frame_generation);
+        if (previous_fg != s.frame_generation.load(std::memory_order_relaxed)) {
+            std::printf("Frame generation setting: %s\n", s.frame_generation ? "enabled" : "disabled");
+        }
         ImGui::EndDisabled();
         if (const char* problem = s.frame_generation_problem.load(std::memory_order_relaxed)) {
             Hint(problem);

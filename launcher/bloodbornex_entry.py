@@ -7,5 +7,12 @@ from bbport_vulkan import main as vulkan_main
 
 
 if __name__ == '__main__':
-    configure()
+    data, _ = configure()
+    from bloodbornex_logs import collect, start_session
+    if '--collect-logs' in sys.argv[1:]:
+        print(collect(data), flush=True)
+        sys.exit(0)
+    # Keep --self-test output visible to the package build's startup check.
+    if '--self-test' not in sys.argv[1:]:
+        start_session(data)
     sys.exit(vulkan_main())

@@ -28,7 +28,9 @@ class PreviewProfileTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(ROOT / 'launcher/bloodbornex_entry.py'),
                                      sys.executable, '-c', program], env=env,
                                     text=True, capture_output=True, check=True, timeout=20)
-            paths = json.loads(result.stdout)
+            sessions = list((root / 'data/bloodbornex/logs').glob('session-*.log'))
+            self.assertEqual(len(sessions), 1)
+            paths = json.loads(sessions[0].read_text().splitlines()[-1])
             self.assertEqual(Path(paths['BB_DATA_DIR']), root / 'data/bloodbornex')
             self.assertEqual(Path(paths['BB_CONFIG']), root / 'data/bloodbornex/bbport.ini')
             self.assertEqual(Path(paths['BB_USER_DIR']), root / 'data/bloodbornex/user')

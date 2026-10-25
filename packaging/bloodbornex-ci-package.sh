@@ -17,11 +17,11 @@ mkdir -p stage/BloodborneX
 cp "$preview" stage/BloodborneX/
 cp packaging/BloodborneX-README.txt stage/BloodborneX/README.txt
 cp LICENSE stage/BloodborneX/
-cp out/python-tests.log out/settings-test.log out/frame-generation-test.log out/package-smoke.log stage/BloodborneX/
+cp out/python-tests.log out/settings-test.log out/frame-generation-test.log out/frame-generation-status.txt out/package-smoke.log stage/BloodborneX/
 # Include corresponding source, including the pinned third-party source and applied FSR patch.
 tar --exclude='./.git' --exclude='*/.git' --exclude='./out' --exclude='./pgo' \
     --exclude='./dist' --exclude='./stage' --exclude='*/__pycache__' \
-    -czf stage/BloodborneX/source.tar.gz .
+    --exclude='./core' --exclude='./core.*' --exclude='./user' --exclude='./logs' --exclude='./.cache' -czf stage/BloodborneX/source.tar.gz .
 python3 - <<'PY'
 import json, pathlib, subprocess
 revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
@@ -30,8 +30,9 @@ result = {
     'app': 'BloodborneX', 'version': 'fg-preview.1', 'platform': 'linux-x86_64',
     'source_revision': revision, 'source_url': 'https://github.com/TheHiepDang/bloodborne_linuX/tree/' + revision,
     'submodules': submodules, 'nixpkgs_revision': '02c087f3fe673c9e317f206a627cb6b910336dbe',
-    'checks_passed': ['Python suite', 'native settings', 'headless FG lifecycle with Vulkan validation',
-                      'bundled AppImage startup and independent profile'],
+    'checks_passed': ['preview profile isolation', 'native settings',
+                      'bundled AppImage startup, runtime graphics smoke and independent profile'],
+    'headless_fg_diagnostic_exit': int(pathlib.Path('out/frame-generation-status.txt').read_text()),
     'steam_deck_gameplay_tested': False, 'game_files_included': False,
 }
 pathlib.Path('stage/BloodborneX/BUILD-PROVENANCE.json').write_text(json.dumps(result, indent=2) + '\n')

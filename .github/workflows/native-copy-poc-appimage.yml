@@ -1,4 +1,4 @@
-name: Native copy POC AppImage
+name: Static VRS POC AppImage
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-copy-poc-appimage-${{ github.ref }}
+  group: static-vrs-poc-appimage-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,12 +43,14 @@ jobs:
           test -s dist/Bloodborne-bbport-x86_64.AppImage
           sha256sum dist/Bloodborne-bbport-x86_64.AppImage > dist/Bloodborne-bbport-x86_64.AppImage.sha256
           grep -aF "${GITHUB_SHA}" out/gpu/libbbgpu.so >/dev/null
+          grep -aF "BB_VRS_MODE" out/gpu/libbbgpu.so >/dev/null
+          grep -aF "VRS draws:" out/gpu/libbbgpu.so >/dev/null
           cat dist/Bloodborne-bbport-x86_64.AppImage.sha256
 
       - name: Upload Steam Deck package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: Bloodborne-native-copy-poc-AppImage
+          name: Bloodborne-static-vrs-poc-AppImage
           path: |
             dist/Bloodborne-bbport-x86_64.AppImage
             dist/Bloodborne-bbport-x86_64.AppImage.sha256

@@ -203,6 +203,47 @@ void Instance::CreateDevice() {
         return true;
     };
 
+    const char* const vrs_env = std::getenv("BB_VRS_MODE");
+    const std::string_view vrs_mode = vrs_env ? vrs_env : "off";
+    bool vrs_requested = vrs_mode == "2x2";
+    if (vrs_mode != "off" && !vrs_requested) {
+        std::printf("VRS: WARNING: unknown BB_VRS_MODE='%s'; falling back to off\n",
+                    vrs_env);
+    }
+    std::printf("VRS: requested mode %s\n", vrs_requested ? "2x2" : "off");
+
+    const bool vrs_extension_available = has(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    bool vrs_feature_available = false;
+    bool vrs_rate_2x2_sample_1 = false;
+    vk::PhysicalDeviceFragmentShadingRatePropertiesKHR vrs_properties{};
+    if (vrs_extension_available) {
+        const auto vrs_features = physical_device.getFeatures2<
+            vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceFragmentShadingRateFeaturesKHR>();
+        vrs_feature_available =
+            vrs_features.get<vk::PhysicalDeviceFragmentShadingRateFeaturesKHR>()
+                .pipelineFragmentShadingRate;
+        const auto vrs_property_chain = physical_device.getProperties2<
+            vk::PhysicalDeviceProperties2, vk::PhysicalDeviceFragmentShadingRatePropertiesKHR>();
+        vrs_properties =
+            vrs_property_chain.get<vk::PhysicalDeviceFragmentShadingRatePropertiesKHR>();
+        const auto rates = Check<"query fragment shading rates">(
+            physical_device.getFragmentShadingRatesKHR());
+        vrs_rate_2x2_sample_1 = std::ranges::any_of(rates, [](const auto& rate) {
+            return rate.fragmentSize.width == 2 && rate.fragmentSize.height == 2 &&
+                   bool(rate.sampleCounts & vk::SampleCountFlagBits::e1);
+        });
+    }
+    std::printf("VRS: extension %s, pipeline feature %s, 2x2@1-sample rate %s; "
+                "max fragment %ux%u, max rasterization samples %#x\n",
+                vrs_extension_available ? "available" : "unavailable",
+                vrs_feature_available ? "available" : "unavailable",
+                vrs_rate_2x2_sample_1 ? "available" : "unavailable",
+                vrs_properties.maxFragmentSize.width, vrs_properties.maxFragmentSize.height,
+                static_cast<unsigned>(vrs_properties.maxFragmentShadingRateRasterizationSamples));
+    ext.fragment_shading_rate =
+        vrs_requested && vrs_extension_available && vrs_feature_available &&
+        vrs_rate_2x2_sample_1 && enable(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+
     for (const char* required :
          {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
           VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME, VK_EXT_ROBUSTNESS_2_EXTENSION_NAME}) {
@@ -425,6 +466,8 @@ void Instance::CreateDevice() {
     vk::PhysicalDeviceShaderFloat8FeaturesEXT float8{.shaderFloat8 = true,
                                                       .shaderFloat8CooperativeMatrix = true};
     vk::PhysicalDeviceCoherentMemoryFeaturesAMD coherent{.deviceCoherentMemory = true};
+    vk::PhysicalDeviceFragmentShadingRateFeaturesKHR fragment_shading_rate{
+        .pipelineFragmentShadingRate = true};
 
     vk::DeviceCreateInfo create_info{
         .queueCreateInfoCount = u32(queues.size()),
@@ -464,6 +507,7 @@ void Instance::CreateDevice() {
     link_if(ext.cooperative_matrix, matrix);
     link_if(ext.float8, float8);
     link_if(ext.guest_uncached, coherent);
+    link_if(ext.fragment_shading_rate, fragment_shading_rate);
 
     // DLSS (optional bridge library) needs its own device extensions on NVIDIA GPUs.
     const size_t own_extensions = enabled.size();
@@ -517,6 +561,23 @@ void Instance::CreateDevice() {
     require(ext.dynamic_state_3,
             reinterpret_cast<const void*>(dispatch.vkCmdSetColorWriteMaskEXT),
             VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    require(ext.fragment_shading_rate,
+            reinterpret_cast<const void*>(dispatch.vkCmdSetFragmentShadingRateKHR),
+            VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    vrs_2x2_enabled = ext.fragment_shading_rate;
+    if (vrs_2x2_enabled) {
+        std::printf("VRS: Vulkan device enabled; effective mode 2x2\n");
+    } else if (!vrs_requested) {
+        std::printf("VRS: Vulkan device not enabled; effective mode off (not requested)\n");
+    } else if (!vrs_extension_available) {
+        std::printf("VRS: Vulkan device not enabled; effective mode off (extension unavailable)\n");
+    } else if (!vrs_feature_available) {
+        std::printf("VRS: Vulkan device not enabled; effective mode off (pipeline feature unavailable)\n");
+    } else if (!vrs_rate_2x2_sample_1) {
+        std::printf("VRS: Vulkan device not enabled; effective mode off (2x2@1-sample unavailable)\n");
+    } else {
+        std::printf("VRS: Vulkan device not enabled; effective mode off (command unavailable)\n");
+    }
     require(ext.memory_fd, reinterpret_cast<const void*>(dispatch.vkGetMemoryFdKHR),
             VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
     ext.dma_buf = ext.dma_buf && ext.memory_fd;

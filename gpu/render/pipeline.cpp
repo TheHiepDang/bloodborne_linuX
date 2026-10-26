@@ -289,6 +289,9 @@ boost::container::static_vector<vk::DynamicState, 32> DynamicStates(const Instan
     } else if (has_vertex_bindings) {
         states.push_back(vk::DynamicState::eVertexInputBindingStride);
     }
+    if (instance.IsVrs2x2Enabled()) {
+        states.push_back(vk::DynamicState::eFragmentShadingRateKHR);
+    }
     return states;
 }
 

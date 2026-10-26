@@ -347,6 +347,14 @@ void OnFlipStats() {
                     BbStats::tick_wait_ns.exchange(0) / (window * 1e7),
                     frames ? double(BbStats::reduced_draws.exchange(0)) / frames : 0.0,
                     frames ? double(BbStats::scene_draws.exchange(0)) / frames : 0.0);
+        const u64 vrs_total = BbStats::vrs_total_draws.exchange(0);
+        const u64 vrs_eligible = BbStats::vrs_eligible_draws.exchange(0);
+        const u64 vrs_coarse = BbStats::vrs_coarse_draws.exchange(0);
+        std::printf("VRS draws: %llu total, %llu eligible, %llu actual 2x2 (%.1f%% of graphics draws)\n",
+                    static_cast<unsigned long long>(vrs_total),
+                    static_cast<unsigned long long>(vrs_eligible),
+                    static_cast<unsigned long long>(vrs_coarse),
+                    vrs_total ? 100.0 * double(vrs_coarse) / double(vrs_total) : 0.0);
         static u64 report_sparse_calls, report_sparse_ranges, report_sparse_ns;
         const u64 sparse_calls = sparse_calls_now - report_sparse_calls;
         const u64 sparse_ranges = sparse_ranges_now - report_sparse_ranges;

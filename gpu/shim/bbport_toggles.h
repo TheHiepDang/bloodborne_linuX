@@ -147,6 +147,9 @@ inline std::atomic<std::uint64_t> t_resident{0}, t_protect{0}, t_image_create{0}
 /// Diagnostic cost of the two implementations of Bloodborne's fefebf9f copy shader.
 inline std::atomic<std::uint64_t> copy_shader_native_calls{0}, copy_shader_native_cpu_ns{0},
     copy_shader_hle_calls{0}, copy_shader_hle_cpu_ns{0};
+/// Static VRS POC: graphics draws considered, passing the conservative eligibility checks, and
+/// actually recorded at 2x2. Collected only with BB_FRAME_STATS=1.
+inline std::atomic<std::uint64_t> vrs_total_draws{0}, vrs_eligible_draws{0}, vrs_coarse_draws{0};
 /// vkQueueBindSparse calls made by the sparse-arena memory backend in the stats window.
 inline std::atomic<std::uint64_t> sparse_bind_calls{0}, sparse_bind_ranges{0},
     sparse_bind_ns{0}, sparse_bind_max_ns{0};

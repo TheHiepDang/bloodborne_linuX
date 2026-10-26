@@ -791,6 +791,42 @@ void Rasterizer::BeginDraw(const GraphicsPipeline* pipeline, const RenderState& 
                     push_data.yscale, push_data.yoffset);
     }
     MarkPass(pipeline, state);
+    // Static VRS POC: coarse shading is limited to native-size, single-sample, opaque G-buffer
+    // draws without fragment-stage side effects. Establish the state for every graphics draw so
+    // 2x2 never leaks into UI, post-processing, transparency, or an unknown pass.
+    const auto& key = pipeline->GetGraphicsKey();
+    const auto* fragment = pipeline->GetStages()[u32(Shader::SwStage::Fragment)];
+    const bool no_blending = std::ranges::none_of(
+        key.blend_controls.begin(), key.blend_controls.begin() + key.num_color_attachments,
+        [](const auto& blend) { return blend.enable; });
+    const bool no_fragment_writes =
+        fragment && !fragment->has_storage_images &&
+        std::ranges::none_of(fragment->buffers,
+                             [](const auto& buffer) { return buffer.is_written; }) &&
+        std::ranges::none_of(fragment->images,
+                             [](const auto& image) { return image.is_written; });
+    const bool vrs_eligible =
+        gbuffer_draw && state.width == 1280 && state.height == 720 &&
+        state.num_color_attachments >= 5 && key.num_samples == 1 &&
+        key.polygon_mode == Gcn::PolygonMode::Fill && Regs().depth_control.depth_enable &&
+        Regs().depth_control.depth_write_enable && key.logic_op == Gcn::ColorControl::LogicOp::Copy &&
+        no_blending && fragment && !fragment->has_discard && no_fragment_writes;
+    const bool vrs_coarse = instance.IsVrs2x2Enabled() && vrs_eligible;
+    if (BbStats::enabled) {
+        BbStats::vrs_total_draws.fetch_add(1, std::memory_order_relaxed);
+        BbStats::vrs_eligible_draws.fetch_add(vrs_eligible, std::memory_order_relaxed);
+        BbStats::vrs_coarse_draws.fetch_add(vrs_coarse, std::memory_order_relaxed);
+    }
+    if (instance.IsVrs2x2Enabled()) {
+        const vk::Extent2D fragment_size{vrs_coarse ? 2u : 1u, vrs_coarse ? 2u : 1u};
+        scheduler.Record([fragment_size](vk::CommandBuffer cmdbuf) {
+            static constexpr std::array combiners{
+                vk::FragmentShadingRateCombinerOpKHR::eKeep,
+                vk::FragmentShadingRateCombinerOpKHR::eKeep,
+            };
+            cmdbuf.setFragmentShadingRateKHR(fragment_size, combiners);
+        });
+    }
     if (occlusion) {
         occlusion->SetPassScale(target_scale[0] * target_scale[1]); // samples at the game's size
     }

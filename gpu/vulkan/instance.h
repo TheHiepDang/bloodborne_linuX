@@ -241,6 +241,10 @@ public:
     bool IsVertexInputDynamicState() const {
         return ext.vertex_input_dynamic_state;
     }
+    /// The experimental static 2x2 fragment shading rate was requested and enabled.
+    bool IsVrs2x2Enabled() const noexcept {
+        return vrs_2x2_enabled;
+    }
     bool IsFragmentShaderBarycentricSupported() const {
         return ext.barycentric;
     }
@@ -368,7 +372,7 @@ private:
             trinary_minmax, nv_mixed_samples, amd_mixed_samples, atomic_float, atomic_float2,
             workgroup_layout, view_2d_of_3d, image_view_min_lod, memory_budget, memory_fd,
             dma_buf, memory_host, compute_derivatives, mixed_float_dot, cooperative_matrix,
-            float8, shader_clock, guest_uncached;
+            float8, shader_clock, guest_uncached, fragment_shading_rate;
     };
 
     vk::UniqueInstance instance;
@@ -403,6 +407,7 @@ private:
     bool subgroup_clock = false;
     bool derivatives_linear = false;
     bool block_texel_view = false;
+    bool vrs_2x2_enabled = false;
 
     std::vector<std::string> available_extensions;
     std::unordered_map<vk::Format, vk::FormatFeatureFlags2> format_features;

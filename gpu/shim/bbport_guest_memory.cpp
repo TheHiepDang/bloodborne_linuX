@@ -13,6 +13,10 @@
 #include "vulkan/instance.h"
 #include "bblayer_gpu_memory.h"
 
+#ifndef BB_BUILD_REVISION
+#define BB_BUILD_REVISION "unknown"
+#endif
+
 extern "C" void runtime_memory_set_guest_chunk_allocator(int (*alloc)(uint64_t phys,
                                                                       uint64_t size));
 extern "C" void runtime_memory_set_guest_chunk_whole(int whole);
@@ -517,6 +521,7 @@ std::atomic<int> layer_default{-1};
 
 bool PcModelGpu(const Vulkan::Instance& instance) {
     static const bool ok = [&] {
+        std::printf("GPU build: source revision %s\n", BB_BUILD_REVISION);
         // The layer's memory module on every GPU; the startup checks in Usable() decide whether
         // the driver can do it. The sparse arena (BB_LAYER_MEMORY=0) is for AMD; not on NVIDIA
         // (only with BB_PC_MODEL_ANY_GPU=1):
@@ -537,6 +542,10 @@ bool PcModelGpu(const Vulkan::Instance& instance) {
         // profile: with the arena a game without one (the US release before 0.51) had the
         // allocator's bookkeeping overwritten by a readback of a stale VRAM copy (issue #119).
         layer_default.store(1, std::memory_order_relaxed);
+        const char* layer_env = std::getenv("BB_LAYER_MEMORY");
+        std::printf("Guest memory: selected %s backend (%s)\n",
+                    LayerMemory() ? "layer-memory" : "sparse-arena",
+                    layer_env && *layer_env ? "BB_LAYER_MEMORY override" : "automatic default");
         if (LayerMemory()) {
             std::printf("Guest memory: the new memory model through the layer's memory module on "
                         "this GPU (vendor 0x%04x): no sparse binding of the game's memory\n",

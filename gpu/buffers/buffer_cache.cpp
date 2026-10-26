@@ -3875,11 +3875,22 @@ void BufferCache::SubmitPendingArenaBinds(Vulkan::SubmitInfo& info) {
         };
         const auto bind_start = std::chrono::steady_clock::now();
         auto submit_result = instance.GetGraphicsQueue().bindSparse(sparse_info);
-        const double bind_ms = std::chrono::duration<double, std::milli>(
-                                   std::chrono::steady_clock::now() - bind_start)
-                                   .count();
+        const u64 bind_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                std::chrono::steady_clock::now() - bind_start)
+                                .count();
+        const double bind_ms = bind_ns / 1e6;
         arena_bind_calls.fetch_add(1, std::memory_order_relaxed);
         arena_bind_ranges.fetch_add(ranges, std::memory_order_relaxed);
+        if (BbStats::enabled) {
+            BbStats::sparse_bind_calls.fetch_add(1, std::memory_order_relaxed);
+            BbStats::sparse_bind_ranges.fetch_add(ranges, std::memory_order_relaxed);
+            BbStats::sparse_bind_ns.fetch_add(bind_ns, std::memory_order_relaxed);
+            u64 maximum = BbStats::sparse_bind_max_ns.load(std::memory_order_relaxed);
+            while (maximum < bind_ns &&
+                   !BbStats::sparse_bind_max_ns.compare_exchange_weak(
+                       maximum, bind_ns, std::memory_order_relaxed)) {
+            }
+        }
         arena_bind_signaled.store(signal_tick, std::memory_order_relaxed);
         if (bind_ms >= 50.0) {
             std::printf("Guest memory: vkQueueBindSparse of %llu ranges took %.0f ms in the driver\n",

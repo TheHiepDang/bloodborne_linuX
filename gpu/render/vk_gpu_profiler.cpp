@@ -47,6 +47,15 @@ void GpuProfiler::WriteTimestamp(u64 key) {
     });
 }
 
+void GpuProfiler::EndScope(Scope scope) {
+    if (!scope || scope.slice != slice || used[slice] + 1 >= SliceQueries) {
+        return;
+    }
+    const u32 end = used[slice];
+    WriteTimestamp(scope.key);
+    scopes[slice].push_back({scope.begin, end, scope.key});
+}
+
 void GpuProfiler::BeginFrame() {
     // Close the frame: one more timestamp without a label.
     if (used[slice] > 0 && used[slice] < SliceQueries) {
@@ -67,6 +76,7 @@ void GpuProfiler::BeginFrame() {
     }
     used[slice] = 0;
     keys[slice].clear();
+    scopes[slice].clear();
     pending[slice] = false;
     Print();
 }
@@ -88,6 +98,13 @@ void GpuProfiler::Collect(u32 which) {
         ++total.segments;
         if (keys[which][i] >= SubmissionGapKey && keys[which][i] < SubmissionGapKey + 0x20) {
             gaps.push_back(ms);
+        }
+    }
+    for (const auto& scope : scopes[which]) {
+        if (scope.begin < count && scope.end < count && stamps[scope.end] >= stamps[scope.begin]) {
+            auto& total = scope_totals[scope.key];
+            total.ms += double(stamps[scope.end] - stamps[scope.begin]) * period_ns / 1e6;
+            ++total.segments;
         }
     }
     ++frames;
@@ -112,6 +129,10 @@ void GpuProfiler::Print() {
         std::printf("  %6.3f ms/frame %5.1f/frame  %s\n", total.ms / frames,
                     double(total.segments) / frames, described[key].c_str());
     }
+    for (const auto& [key, total] : scope_totals) {
+        std::printf("  inclusive scope: %6.3f ms/frame %5.1f/frame  %s\n", total.ms / frames,
+                    double(total.segments) / frames, described[key].c_str());
+    }
     if (!gaps.empty()) {
         // The gaps one by one: the presenter's own submissions (outside this scheduler) fall in
         // them too, so a steady gap per frame is its work, scattered long ones are waits.
@@ -127,6 +148,7 @@ void GpuProfiler::Print() {
         gaps.clear();
     }
     totals.clear();
+    scope_totals.clear();
     frames = 0;
 }
 

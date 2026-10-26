@@ -2,6 +2,7 @@
 // bbport render: Rasterizer, the draw and dispatch entry points: pipeline selection, then recording here or on the
 // draw recording thread (raster_pipe.cpp), and the per-frame bookkeeping.
 
+#include <chrono>
 #include <mutex>
 #include <set>
 #include <string>
@@ -1019,6 +1020,35 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
     const auto& cs_program = CsRegs();
 
     const auto& cs = pipeline->GetStage(Shader::SwStage::Compute);
+    const bool copy_shader = Game::BufferCopyShader() != 0 &&
+                             cs.pgm_hash == Game::BufferCopyShader();
+    const auto copy_cpu_start = BbStats::enabled && copy_shader
+                                    ? std::chrono::steady_clock::now()
+                                    : std::chrono::steady_clock::time_point{};
+    auto* const gpu_profiler = copy_shader ? GpuProfiler::Get() : nullptr;
+    const auto copy_gpu_scope = gpu_profiler
+                                    ? gpu_profiler->BeginScope(0xFEFEBF9F'C0F1ull, [] {
+                                          return std::string{
+                                              "copy shader fefebf9f total (inclusive)"};
+                                      })
+                                    : GpuProfiler::Scope{};
+    const auto finish_copy_stats = [&](bool hle_path) {
+        if (gpu_profiler) {
+            gpu_profiler->EndScope(copy_gpu_scope);
+        }
+        if (!BbStats::enabled || !copy_shader) {
+            return;
+        }
+        const u64 ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           std::chrono::steady_clock::now() - copy_cpu_start)
+                           .count();
+        auto& calls = hle_path ? BbStats::copy_shader_hle_calls
+                               : BbStats::copy_shader_native_calls;
+        auto& total = hle_path ? BbStats::copy_shader_hle_cpu_ns
+                               : BbStats::copy_shader_native_cpu_ns;
+        calls.fetch_add(1, std::memory_order_relaxed);
+        total.fetch_add(ns, std::memory_order_relaxed);
+    };
     // After the resource binding: its transfers (image uploads, downloads) mark themselves.
     const auto mark = [&] {
         if (auto* profiler = GpuProfiler::Get()) {
@@ -1037,6 +1067,7 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
         hle = ExecuteShaderHLE(cs, Regs(), cs_program, *this);
     }
     if (hle) {
+        finish_copy_stats(true);
         return;
     }
     // bbport: the game's copy shader running as itself (BB_COPY_SHADER_NATIVE): its destinations stay in
@@ -1057,6 +1088,7 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
     buffer_cache.force_writes_in_place = false;
     buffer_cache.precise_writes = nullptr;
     if (!bound) {
+        finish_copy_stats(false);
         return;
     }
 
@@ -1121,6 +1153,7 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
 
     ResetBindings(true);
     scheduler.KickRecording();
+    finish_copy_stats(false);
 }
 
 void Rasterizer::DispatchIndirect(VAddr address, u32 offset, u32 size) {

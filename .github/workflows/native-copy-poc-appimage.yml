@@ -1,0 +1,57 @@
+name: Native copy POC AppImage
+
+on:
+  push:
+    branches:
+      - codex/native-copy-poc-appimage
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-copy-poc-appimage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-appimage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out source
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b
+        with:
+          nix_path: nixpkgs=https://github.com/NixOS/nixpkgs/archive/02c087f3fe673c9e317f206a627cb6b910336dbe.tar.gz
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            max-jobs = 2
+            cores = 2
+
+      - name: Build client
+        run: nix-shell shell.nix --run 'bash build.sh'
+
+      - name: Package AppImage
+        run: nix-shell shell.nix --run 'bash packaging/appimage.sh'
+
+      - name: Record checksum and build identity
+        run: |
+          test -s dist/Bloodborne-bbport-x86_64.AppImage
+          sha256sum dist/Bloodborne-bbport-x86_64.AppImage > dist/Bloodborne-bbport-x86_64.AppImage.sha256
+          grep -aF "${GITHUB_SHA}" out/gpu/libbbgpu.so >/dev/null
+          cat dist/Bloodborne-bbport-x86_64.AppImage.sha256
+
+      - name: Upload Steam Deck package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: Bloodborne-native-copy-poc-AppImage
+          path: |
+            dist/Bloodborne-bbport-x86_64.AppImage
+            dist/Bloodborne-bbport-x86_64.AppImage.sha256
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

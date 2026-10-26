@@ -5,6 +5,27 @@ project(bbgpu LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Identify the source used by packaged binaries. The package version is intentionally stable
+# (bbport-0.1), so it cannot answer which renderer revision produced a captured AppImage.
+set(BB_BUILD_REVISION "unknown")
+find_package(Git QUIET)
+if (Git_FOUND)
+    execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --verify HEAD
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        OUTPUT_VARIABLE BB_BUILD_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE BB_BUILD_REVISION_RESULT ERROR_QUIET)
+    if (NOT BB_BUILD_REVISION_RESULT EQUAL 0)
+        set(BB_BUILD_REVISION "unknown")
+    else()
+        execute_process(COMMAND ${GIT_EXECUTABLE} diff-index --quiet HEAD --
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+            RESULT_VARIABLE BB_BUILD_DIRTY ERROR_QUIET)
+        if (BB_BUILD_DIRTY EQUAL 1)
+            string(APPEND BB_BUILD_REVISION "-dirty")
+        endif()
+    endif()
+endif()
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
@@ -175,6 +196,7 @@ else()
 endif()
 add_library(bbgpu ${BBGPU_LIBRARY_TYPE} ${RECOMPILER} ${COMMON} ${PLATFORM_SOURCES} ${SHIM_SOURCES} ${LAYER_SOURCES} ${GAME_SOURCES} ${CP_SOURCES}
     ${RENDER_SOURCES} ${UPSCALE_SOURCES})
+target_compile_definitions(bbgpu PRIVATE BB_BUILD_REVISION="${BB_BUILD_REVISION}")
 add_dependencies(bbgpu host_shaders)
 # In-game settings menu: Dear ImGui (third_party/imgui, MIT) with its Vulkan backend, and an
 # embedded Cyrillic font (third_party/fonts).

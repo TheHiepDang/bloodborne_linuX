@@ -23,6 +23,14 @@ class Scheduler;
 
 class GpuProfiler {
 public:
+    struct Scope {
+        u32 slice = 0;
+        u32 begin = 0;
+        u64 key = 0;
+        explicit operator bool() const noexcept {
+            return key != 0;
+        }
+    };
     /// The profiler when BB_GPU_PROFILE=1, else null.
     static GpuProfiler* Get() noexcept {
         return instance_ptr;
@@ -46,6 +54,23 @@ public:
     void Resume(u64 key) {
         WriteTimestamp(key);
     }
+
+    /// An inclusive GPU interval. Unlike ordinary labels, nested transfer labels do not remove
+    /// their time from this total. Used only by diagnostic profiling experiments.
+    template <typename Describe>
+    Scope BeginScope(u64 key, Describe&& describe) {
+        // Keep room for this scope's begin/end timestamps and the frame-closing timestamp.
+        if (used[slice] + 2 >= SliceQueries) {
+            return {};
+        }
+        if (!described.contains(key)) {
+            described.emplace(key, describe());
+        }
+        const Scope scope{slice, used[slice], key};
+        WriteTimestamp(key);
+        return scope;
+    }
+    void EndScope(Scope scope);
 
     /// Whether `other` is the scheduler it records into (the presenter has its own).
     [[nodiscard]] bool Records(const Scheduler* other) const noexcept {
@@ -71,6 +96,12 @@ private:
     double period_ns = 1.0;
     u32 slice = 0;
     std::array<std::vector<u64>, NumSlices> keys; ///< label of each timestamp but the last
+    struct ScopeQueries {
+        u32 begin;
+        u32 end;
+        u64 key;
+    };
+    std::array<std::vector<ScopeQueries>, NumSlices> scopes;
     std::array<u32, NumSlices> used{};
     std::array<bool, NumSlices> pending{};
     std::unordered_map<u64, std::string> described;
@@ -79,6 +110,7 @@ private:
         u64 segments = 0;
     };
     std::unordered_map<u64, Total> totals;
+    std::unordered_map<u64, Total> scope_totals;
     static constexpr u64 SubmissionGapKey = 0x5B317ull; ///< Scheduler's "between submissions"
     std::vector<double> gaps;
     u64 frames = 0;

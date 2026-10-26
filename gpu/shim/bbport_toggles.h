@@ -144,6 +144,12 @@ inline std::atomic<std::uint64_t> gpu_frames{0};
 inline std::atomic<std::uint64_t> t_resident{0}, t_protect{0}, t_image_create{0}, t_refresh{0},
     t_staging{0}, t_host_wait{0}, t_copy{0}, copy_bytes{0}, t_read_faults{0}, read_faults{0},
     t_write_faults{0}, t_copy_cpu{0}, copy_sys_us{0}, copy_minflt{0};
+/// Diagnostic cost of the two implementations of Bloodborne's fefebf9f copy shader.
+inline std::atomic<std::uint64_t> copy_shader_native_calls{0}, copy_shader_native_cpu_ns{0},
+    copy_shader_hle_calls{0}, copy_shader_hle_cpu_ns{0};
+/// vkQueueBindSparse calls made by the sparse-arena memory backend in the stats window.
+inline std::atomic<std::uint64_t> sparse_bind_calls{0}, sparse_bind_ranges{0},
+    sparse_bind_ns{0}, sparse_bind_max_ns{0};
 /// Layer memory module (BB_LAYER_MEMORY), wall time per kind (ns, inclusive): 0 mprotect for write
 /// traps, 1 promotions, 2 demotions, 3 trap processing, 4 yielding VRAM, 5 volatile refreshes,
 /// 6 republishing paged entries, 7 paged uploads; and the mprotect calls.

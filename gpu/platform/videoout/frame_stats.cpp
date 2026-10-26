@@ -142,6 +142,13 @@ void OnFlipStats() {
     last_trf = trf;
     last_twf = twf;
     const u64 copy_ns = BbStats::t_copy.load(), copy_bytes = BbStats::copy_bytes.load();
+    const u64 sparse_calls_now = BbStats::sparse_bind_calls.load();
+    const u64 sparse_ranges_now = BbStats::sparse_bind_ranges.load();
+    const u64 sparse_ns_now = BbStats::sparse_bind_ns.load();
+    const u64 native_copy_calls_now = BbStats::copy_shader_native_calls.load();
+    const u64 native_copy_ns_now = BbStats::copy_shader_native_cpu_ns.load();
+    const u64 hle_copy_calls_now = BbStats::copy_shader_hle_calls.load();
+    const u64 hle_copy_ns_now = BbStats::copy_shader_hle_cpu_ns.load();
     u64 proc_flt = 0;
     if (rusage usage{}; getrusage(RUSAGE_SELF, &usage) == 0) {
         proc_flt = usage.ru_minflt;
@@ -340,6 +347,34 @@ void OnFlipStats() {
                     BbStats::tick_wait_ns.exchange(0) / (window * 1e7),
                     frames ? double(BbStats::reduced_draws.exchange(0)) / frames : 0.0,
                     frames ? double(BbStats::scene_draws.exchange(0)) / frames : 0.0);
+        static u64 report_sparse_calls, report_sparse_ranges, report_sparse_ns;
+        const u64 sparse_calls = sparse_calls_now - report_sparse_calls;
+        const u64 sparse_ranges = sparse_ranges_now - report_sparse_ranges;
+        const u64 sparse_ns = sparse_ns_now - report_sparse_ns;
+        report_sparse_calls = sparse_calls_now;
+        report_sparse_ranges = sparse_ranges_now;
+        report_sparse_ns = sparse_ns_now;
+        const u64 sparse_max_ns = BbStats::sparse_bind_max_ns.exchange(0);
+        std::printf("Sparse binds: %llu calls, %llu ranges, %.2f ms total, %.2f ms maximum\n",
+                    (unsigned long long)sparse_calls, (unsigned long long)sparse_ranges,
+                    sparse_ns / 1e6, sparse_max_ns / 1e6);
+        static u64 report_native_calls, report_native_ns, report_hle_calls, report_hle_ns;
+        const u64 native_calls = native_copy_calls_now - report_native_calls;
+        const u64 native_ns = native_copy_ns_now - report_native_ns;
+        const u64 hle_calls = hle_copy_calls_now - report_hle_calls;
+        const u64 hle_ns = hle_copy_ns_now - report_hle_ns;
+        report_native_calls = native_copy_calls_now;
+        report_native_ns = native_copy_ns_now;
+        report_hle_calls = hle_copy_calls_now;
+        report_hle_ns = hle_copy_ns_now;
+        if (native_calls || hle_calls) {
+            std::printf("Copy shader CPU: translated %llu calls, %.3f ms/frame, %.2f us/call; "
+                        "HLE %llu calls, %.3f ms/frame, %.2f us/call\n",
+                        (unsigned long long)native_calls, native_ns / (frames * 1e6),
+                        native_calls ? native_ns / (native_calls * 1e3) : 0.0,
+                        (unsigned long long)hle_calls, hle_ns / (frames * 1e6),
+                        hle_calls ? hle_ns / (hle_calls * 1e3) : 0.0);
+        }
         BbMem::FaultSites::Report();
         if (const u64 notes = BbStats::cpu_write_notes.exchange(0)) {
             std::printf("Write notices: %.0f/s, %.2f MB/s (libc copies over pages the GPU side "
@@ -441,9 +476,10 @@ void OnFlipStats() {
                 spikes += ms > 1.5 * median;
             }
             const double mean = sum / intervals.size();
-            std::printf("Frame pacing: median %.2f ms, stddev %.2f ms, p99 %.2f ms, "
+            std::printf("Frame pacing: median %.2f ms, stddev %.2f ms, p95 %.2f ms, p99 %.2f ms, "
                         "%u frames over 1.5x median\n",
                         median, std::sqrt(std::max(0.0, sq / intervals.size() - mean * mean)),
+                         sorted[std::min(sorted.size() - 1, sorted.size() * 95 / 100)],
                         sorted[std::min(sorted.size() - 1, sorted.size() * 99 / 100)], spikes);
         }
         intervals.clear();

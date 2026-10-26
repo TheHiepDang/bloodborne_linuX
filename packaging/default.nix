@@ -12,7 +12,8 @@ let
   # FSR 4.1.1 models are extracted from AMD's DLLs: never in a public package. BB_PACKAGE_FSR411=1
   # (appimage.sh runs nix with --impure) bundles the local fsr4_411 for one's own devices.
   fsr411 = builtins.getEnv "BB_PACKAGE_FSR411" == "1";
-  assetDirs = [ "scripts" "patches" "fsr4_shaders" "launcher" "tools/fsr4cap" ]
+  assetDirs = [ "scripts" "patches" "launcher" "tools/fsr4cap" ]
+    ++ lib.optional (builtins.pathExists (root + "/fsr4_shaders")) "fsr4_shaders"
     ++ lib.optional fsr411 "fsr4_411";
   # Only what the package needs (the tree also holds builds, profiles and captures).
   wanted = [
@@ -156,7 +157,8 @@ pkgs.stdenv.mkDerivation {
     d=$out/share/bbport
     mkdir -p $d/bin $out/bin
     cp run.sh $d/
-    cp -r scripts patches fsr4_shaders launcher $d/
+    cp -r scripts patches launcher $d/
+    if [ -d fsr4_shaders ]; then cp -r fsr4_shaders $d/; fi
     mkdir -p $d/tools
     cp -r tools/fsr4cap $d/tools/
     rm -rf $d/tools/fsr4cap/__pycache__
